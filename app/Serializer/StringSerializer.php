@@ -2,12 +2,25 @@
 
 namespace App\Serializer;
 
-
+/**
+ * String serializer implementation
+ * @package App\Serializer
+ */
 class StringSerializer implements ISerializer
 {
     const BAD_TYPES = [
         '/^class@anonymous/',
-        '/^Closure/'
+        '/^Closure/',
+    ];
+
+    const CHAR_TO_TYPE = [
+        'N' => 'NULL',
+        'b' => 'boolean',
+        'i' => 'integer',
+        'd' => 'double',
+        's' => 'string',
+        'a' => 'array',
+        'O' => 'object',
     ];
 
     /**
@@ -47,16 +60,26 @@ class StringSerializer implements ISerializer
 
     /**
      * @inheritdoc
+     * @throws BadSerializedValueException
      */
     public function unserialize($data)
     {
-        // TODO: Implement unserialize() method.
+        $typesMap = self::CHAR_TO_TYPE;
+        if (is_string($data) && strlen($data) && isset($typesMap[$data[0]])) {
+            $type = $typesMap[$data[0]];
+            $method = "hydrate" . ucfirst(strtolower($type));
+
+            return call_user_func([$this, $method], $data);
+        }
+
+        throw BadSerializedValueException(sprintf("Cannot unserialize data: `%s`", $data));
     }
 
     /**
      * @return string
      */
-    private function compressNull() {
+    private function compressNull()
+    {
         return 'N;';
     }
 
@@ -84,6 +107,7 @@ class StringSerializer implements ISerializer
      */
     private function compressDouble($val)
     {
+        $val = (double)$val;
         return "d:{$val};";
     }
 
@@ -141,6 +165,42 @@ class StringSerializer implements ISerializer
         $result .= "}";
 
         return $result;
+    }
+
+    /**
+     * @param string $val
+     * @return null
+     */
+    private function hydrateNull($val)
+    {
+        return null;
+    }
+
+    /**
+     * @param string $val
+     * @return bool
+     */
+    private function hydrateBoolean($val)
+    {
+        return (bool)substr($val, 2, 1);
+    }
+
+    /**
+     * @param string $val
+     * @return int
+     */
+    private function hydrateInteger($val)
+    {
+        return (int)substr($val, 2, -1);
+    }
+
+    /**
+     * @param string $val
+     * @return float
+     */
+    private function hydrateDouble($val)
+    {
+        return (double)substr($val, 2, -1);
     }
 
     /**
