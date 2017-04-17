@@ -24,7 +24,7 @@ class StringSerializer implements ISerializer
     ];
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      * @throws BadSerializedValueException
      */
     public function serialize($value)
@@ -59,7 +59,7 @@ class StringSerializer implements ISerializer
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      * @throws BadSerializedValueException
      */
     public function unserialize($data)
@@ -107,7 +107,6 @@ class StringSerializer implements ISerializer
      */
     private function compressDouble($val)
     {
-        $val = (double)$val;
         return "d:{$val};";
     }
 
@@ -140,6 +139,7 @@ class StringSerializer implements ISerializer
     }
 
     /**
+     * TODO: protected and private methods markings
      * @param object $val
      * @return string
      * @throws BadSerializedValueException
@@ -154,9 +154,12 @@ class StringSerializer implements ISerializer
             throw new BadSerializedValueException(sprintf("Bad type: %s", $valName));
         }
 
-        $result = "O:{$valNameLen}:\"{$valName}\":{";
+        $reflProperties = $reflect->getProperties();
+        $propsCount = count($reflProperties);
 
-        foreach ($reflect->getProperties() as $prop) {
+        $result = "O:{$valNameLen}:\"{$valName}\":{$propsCount}:{";
+
+        foreach ($reflProperties as $prop) {
             $propName = $prop->getName();
             $propVal = $prop->getValue($val);
             $result .= $this->serialize($propName) . $this->serialize($propVal);
@@ -182,7 +185,7 @@ class StringSerializer implements ISerializer
      */
     private function hydrateBoolean($val)
     {
-        return (bool)substr($val, 2, 1);
+        return (bool) substr($val, 2, -1);
     }
 
     /**
@@ -191,7 +194,7 @@ class StringSerializer implements ISerializer
      */
     private function hydrateInteger($val)
     {
-        return (int)substr($val, 2, -1);
+        return (int) substr($val, 2, -1);
     }
 
     /**
@@ -200,7 +203,61 @@ class StringSerializer implements ISerializer
      */
     private function hydrateDouble($val)
     {
-        return (double)substr($val, 2, -1);
+        return (double) substr($val, 2, -1);
+    }
+
+    /**
+     * @param $val
+     * @return string
+     */
+    private function hydrateString($val)
+    {
+        $valStartPos = mb_strpos($val, ":", 2) + 2;
+        return (string) mb_substr($val, $valStartPos, -2);
+    }
+
+    /**
+     * @param $val
+     * @return array|mixed
+     */
+    private function hydrateArray($val)
+    {
+        $resultArr = [];
+        $valStartPos = mb_strpos($val, ":", 2) + 2;
+        $arrDefinitionString = mb_substr($val, $valStartPos, -1);
+
+        if ($arrDefinitionString) {
+            // TODO: recursive string parser
+            $resultArr = unserialize($val);
+        }
+
+        return $resultArr;
+    }
+
+    /**
+     * @param $val
+     * @return mixed
+     * @throws BadSerializedValueException
+     */
+    private function hydrateObject($val)
+    {
+        $valStartPos = mb_strpos($val, ":", 2) + 1;
+        $objString = mb_substr($val, $valStartPos, -1);
+        list($objFQCN, $propCount, $objDefinitionString) = explode(":", $objString, 3);
+        $objFQCN = str_replace('"', '', $objFQCN);
+
+        if (class_exists($objFQCN) && $objDefinitionString) {
+            // TODO: recursive string parser
+            return unserialize($val);
+        }
+
+        throw new BadSerializedValueException(
+            sprintf(
+                "Couldn't recreate serialized object: `%s` from the value %s",
+                $objFQCN,
+                $val
+            )
+        );
     }
 
     /**

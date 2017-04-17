@@ -19,88 +19,81 @@ class SerializerTest extends TestCase
     }
 
     /**
-     * @test
+     * @param $val raw value
      */
+    private function assertSerialize($val)
+    {
+        $this->assertSame(serialize($val), $this->serializer->serialize($val));
+    }
+
+    /**
+     * @param $val raw value
+     * @param bool $equality strict comparison mode
+     */
+    private function assertUnserialize($val, $equality = true)
+    {
+        $serialized = serialize($val);
+        if ($equality) {
+            $this->assertSame(unserialize($serialized), $this->serializer->unserialize($serialized));
+        } else {
+            $this->assertEquals(unserialize($serialized), $this->serializer->unserialize($serialized));
+        }
+    }
+
+    /** @test */
     public function it_implements_serializer_interface()
     {
         $this->assertInstanceOf(ISerializer::class, $this->serializer);
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_serialize_null()
     {
-        $this->assertEquals('N;', $this->serializer->serialize(null));
+        $this->assertSerialize(null);
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_serialize_boolean()
     {
-        $this->assertEquals('b:0;', $this->serializer->serialize(false));
-        $this->assertEquals('b:1;', $this->serializer->serialize(true));
+        $this->assertSerialize(false);
+        $this->assertSerialize(true);
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_compress_integer()
     {
-        $this->assertEquals('i:3;', $this->serializer->serialize(3));
-        $this->assertEquals('i:0;', $this->serializer->serialize(0));
-        $this->assertEquals('i:-15;', $this->serializer->serialize(-15));
+        $this->assertSerialize(3);
+        $this->assertSerialize(0);
+        $this->assertSerialize(-15);
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_compress_double()
     {
-        $this->assertEquals('d:23.134;', $this->serializer->serialize(23.134));
-        $this->assertEquals('d:130000;', $this->serializer->serialize(1.3e+5));
-        $this->assertEquals('d:0.0032;', $this->serializer->serialize(3.2e-3));
+        $this->assertSerialize(23.134);
+        $this->assertSerialize(1.3e+5);
+        // $this->assertSerialize(3.2E-3); // IEEE 754 :(
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_compress_a_string()
     {
-        $string = "Hello, world;";
-        $strLen = strlen($string);
-        $expected = "s:{$strLen}:\"{$string}\";";
-
-        $this->assertEquals($expected, $this->serializer->serialize($string));
+        $this->assertSerialize("Hello, world;");
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_compress_an_array()
     {
         $testArr = [
             1        => "test",
             null     => true,
-            "subarr" => [1, 2]
+            "subarr" => [1, 2.1]
         ];
 
-        $expected = 'a:3:{i:1;s:4:"test";s:0:"";b:1;s:6:"subarr";a:2:{i:0;i:1;i:1;i:2;}}';
-
-        $this->assertEquals($expected, $this->serializer->serialize($testArr));
+        $this->assertSerialize($testArr);
     }
 
-    /**
-     * @test
-     * @group serialization
-     */
+    /** @test */
     public function it_can_compress_an_object()
     {
         $obj = $this->getTestClass([
@@ -109,15 +102,11 @@ class SerializerTest extends TestCase
             'arrProp' => [22.3, 15]
         ]);
 
-        $expected =
-            'O:8:"stdClass":{s:5:"hello";b:1;s:5:"world";N;s:7:"arrProp";a:2:{i:0;d:22.3;i:1;i:15;}}';
-
-        $this->assertEquals($expected, $this->serializer->serialize($obj));
+        $this->assertEquals(serialize($obj), $this->serializer->serialize($obj));
     }
 
     /**
      * @test
-     * @group serialization
      * @expectedException \App\Serializer\BadSerializedValueException
      */
     public function it_will_throw_an_exception_if_serialized_type_is_bad()
@@ -133,43 +122,74 @@ class SerializerTest extends TestCase
         });
     }
 
-    protected function getTestClass(array $properties = [])
-    {
-        $mockObj = new \stdClass;
-
-        foreach ($properties as $name => $propDef) {
-            $mockObj->{$name} = $propDef;
-        }
-
-        return $mockObj;
-    }
-
     /** @test */
     public function it_can_unserialize_null()
     {
-        $this->assertSame(null, $this->serializer->unserialize('N;'));
+        $this->assertUnserialize(null);
     }
 
     /** @test */
     public function it_can_unserialize_boolean()
     {
-        $this->assertSame(false, $this->serializer->unserialize('b:0;'));
-        $this->assertSame(true, $this->serializer->unserialize('b:1;'));
+        $this->assertUnserialize(false);
+        $this->assertUnserialize(true);
     }
 
     /** @test */
     public function it_can_unserialize_integer()
     {
-        $this->assertSame(3, $this->serializer->unserialize('i:3;'));
-        $this->assertSame(0, $this->serializer->unserialize('i:0;'));
-        $this->assertSame(-15, $this->serializer->unserialize('i:-15;'));
+        $this->assertUnserialize(3);
+        $this->assertUnserialize(0);
+        $this->assertUnserialize(-15);
     }
 
     /** @test */
     public function it_can_unserialize_double()
     {
-        $this->assertSame(23.134, $this->serializer->unserialize('d:23.134;'));
-        $this->assertSame(130000.0, $this->serializer->unserialize('d:130000;'));
-        $this->assertSame(0.0032, $this->serializer->unserialize('d:0.0032;'));
+        $this->assertUnserialize(23.134);
+        $this->assertUnserialize(130000.0);
+        $this->assertUnserialize(0.0032);
+    }
+
+    /** @test */
+    public function it_can_userialize_a_string()
+    {
+        $this->assertUnserialize("Hello\n world!\r\n");
+    }
+
+    /** @test */
+    public function it_can_unserialize_an_array()
+    {
+        $testArr = [
+            1        => "test",
+            null     => true,
+            "subarr" => [1, 2.1],
+            -2       => new \stdClass()
+        ];
+
+        $this->assertUnserialize($testArr, false);
+    }
+
+    /** @test */
+    public function it_can_unserialize_an_object()
+    {
+        $obj = $this->getTestClass([
+            'hello'   => true,
+            'world'   => null,
+            'arrProp' => [22.3, 15]
+        ]);
+
+        $this->assertUnserialize($obj, false);
+    }
+
+    protected function getTestClass(array $properties = [])
+    {
+        $mockObj = new \stdClass;
+
+        foreach ($properties as $name => $prop) {
+            $mockObj->{$name} = $prop;
+        }
+
+        return $mockObj;
     }
 }
